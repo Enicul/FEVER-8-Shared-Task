@@ -471,19 +471,66 @@ class EV2REvaluator:
         return predictions_w_scores
 
     def prompt_api_model(self, srcs, tgts, input_type):
+        # ── Checkpoint support ────────────────────────────────────────────
+        # If EV2R_CHECKPOINT_DIR is set, save/resume per-claim responses.
+        # Each call (question / qa_pair) gets its own file in that dir.
+        checkpoint_dir = os.environ.get("EV2R_CHECKPOINT_DIR")
+        checkpoint_path = None
+        already_done = {}  # idx -> response dict
+        if checkpoint_dir:
+            os.makedirs(checkpoint_dir, exist_ok=True)
+            checkpoint_path = os.path.join(checkpoint_dir, f"{input_type}.jsonl")
+            if os.path.exists(checkpoint_path):
+                with open(checkpoint_path) as f:
+                    for line in f:
+                        try:
+                            rec = json.loads(line)
+                            already_done[rec["_idx"]] = rec["response"]
+                        except Exception:
+                            pass
+                print(f"[CHECKPOINT] Resuming {input_type}: {len(already_done)}/{len(tgts)} already done")
+
         responses = []
+        ckpt_fh = None
+        if checkpoint_path:
+            ckpt_fh = open(checkpoint_path, "a")
 
         for i, tgt_sample in tqdm.tqdm(enumerate(tgts), desc="feed the prompt to api model ..."):
             print("{}/{}".format(i, len(tgts)))
             pred_sample = srcs[i]
-            #
+
+            # Resume: skip claims already in checkpoint
+            if i in already_done:
+                # reconstruct a response-like dict from saved record
+                class _CachedResp:
+                    pass
+                cr = _CachedResp()
+                cr.response = already_done[i]
+                cr.prompt = ""
+                cr.input = ""
+                responses.append(cr)
+                print(f"[CHECKPOINT] skip {i} (cached)")
+                continue
+
             prompt = self.prepare_prompt(tgt_sample, pred_sample, input_type)
             #
             attempt = 0
             while attempt < self.MAX_RETRIES:
                 try:
                     response = self.query_openai(prompt)
-                    responses.append(self.process_output(tgt_sample, response))
+                    processed = self.process_output(tgt_sample, response)
+                    responses.append(processed)
+                    # Save checkpoint
+                    if ckpt_fh:
+                        try:
+                            saved = {
+                                "_idx": i,
+                                "response": processed.response if hasattr(processed, "response") else None,
+                            }
+                            ckpt_fh.write(json.dumps(saved, default=str) + "\n")
+                            ckpt_fh.flush()
+                        except Exception as _e:
+                            print(f"[CHECKPOINT] save failed at {i}: {_e}")
                     print("One request successfully processed..")
                     break
                 except:
@@ -491,6 +538,9 @@ class EV2REvaluator:
                     wait_time = 10**attempt  # Exponential backoff
                     print(f"Request timed out. Retrying in {wait_time} seconds...")
                     time.sleep(wait_time)
+
+        if ckpt_fh:
+            ckpt_fh.close()
 
         return responses
 
