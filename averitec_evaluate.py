@@ -713,10 +713,16 @@ def compute(solution_file, submission_file):
     pred_questions, ref_questions, pred_qa_pairs, ref_qa_pairs = EV2R_scorer.prepare_dataset(
         public_submission_df[target_cols], public_solution_df[target_cols]
     )
-    # Q only
-    q_responses = EV2R_scorer.prompt_api_model(pred_questions, ref_questions, input_type="question")
-    q_evi_scores = EV2R_scorer.calculate_question_scores(q_responses)
-    ev2r_q_recall, q_recall_list = EV2R_scorer.extract_recall_score(q_evi_scores)
+    # Q only (can be skipped via EV2R_SKIP_QONLY=1 for faster runs — Q+A is what matters)
+    if os.environ.get("EV2R_SKIP_QONLY", "").lower() in ("1", "true", "yes"):
+        print("[SKIP] Q-only Ev2R phase skipped (EV2R_SKIP_QONLY set)")
+        q_responses = []
+        ev2r_q_recall = 0.0
+        q_recall_list = [0.0] * len(pred_questions)
+    else:
+        q_responses = EV2R_scorer.prompt_api_model(pred_questions, ref_questions, input_type="question")
+        q_evi_scores = EV2R_scorer.calculate_question_scores(q_responses)
+        ev2r_q_recall, q_recall_list = EV2R_scorer.extract_recall_score(q_evi_scores)
     # Q + A
     qa_responses = EV2R_scorer.prompt_api_model(pred_qa_pairs, ref_qa_pairs, input_type="qa_pair")
     qa_evi_scores = EV2R_scorer.calculate_prediction_scores(qa_responses)
