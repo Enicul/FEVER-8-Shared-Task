@@ -298,6 +298,8 @@ class EV2REvaluator:
         for i in range(len(srcs)):
             # ------------------------- extract questions and QA pairs from src files
             src_qa_pairs = srcs.iloc[i]["evi"]
+            if not isinstance(src_qa_pairs, str):
+                src_qa_pairs = ""
             src_qa_pair_list = src_qa_pairs.split("\t\t\n\n")
 
             src_q_evidence = []
@@ -325,6 +327,8 @@ class EV2REvaluator:
 
             # ------------------------- extract questions and QA pairs from tgt files
             tgt_qa_pairs = tgts.iloc[i]["evi"]
+            if not isinstance(tgt_qa_pairs, str):
+                tgt_qa_pairs = ""
             tgt_qa_pair_list = tgt_qa_pairs.split("\t\t\n\n")
 
             tgt_q_evidence = []
