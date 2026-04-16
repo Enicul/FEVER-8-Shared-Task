@@ -87,8 +87,10 @@ class AVeriTeCEvaluator:
 
         for i in tqdm.tqdm(range(len(srcs))):
             src_questions, tgt_questions = [], []
-            # prediction
+            # prediction (guard against NaN / non-string evi cells)
             pred_evidence = srcs.iloc[i]["evi"]
+            if not isinstance(pred_evidence, str):
+                pred_evidence = ""
             pred_evi_pairs = pred_evidence.split("\t\t\n\n")
 
             for pred_qa in pred_evi_pairs:
@@ -98,8 +100,10 @@ class AVeriTeCEvaluator:
 
             src_questions = src_questions[: self.max_questions]
 
-            # gold
+            # gold (guard against NaN / non-string evi cells)
             gold_evidence = tgts.iloc[i]["evi"]
+            if not isinstance(gold_evidence, str):
+                gold_evidence = ""
             gold_qa_pairs = gold_evidence.split("\t\t\n\n")
 
             for gold_qa in gold_qa_pairs:
@@ -150,6 +154,8 @@ class AVeriTeCEvaluator:
         # prediction
         src_strings = []
         pred_evidence = src["evi"]
+        if not isinstance(pred_evidence, str):
+            pred_evidence = ""
         pred_qa_pairs = pred_evidence.split("\t\t\n\n")
 
         for qa_pair in pred_qa_pairs:
@@ -163,6 +169,8 @@ class AVeriTeCEvaluator:
         # gold
         tgt_strings = []
         gold_evidence = tgt["evi"]
+        if not isinstance(gold_evidence, str):
+            gold_evidence = ""
         gold_qa_pairs = gold_evidence.split("\t\t\n\n")
 
         for qa_pair in gold_qa_pairs:
@@ -188,6 +196,8 @@ class AVeriTeCEvaluator:
             # pred
             src_strings = []
             pred_evidence = srcs.iloc[i]["evi"]
+            if not isinstance(pred_evidence, str):
+                pred_evidence = ""
             pred_qa_pairs = pred_evidence.split("\t\t\n\n")
 
             for qa_pair in pred_qa_pairs:
@@ -201,6 +211,8 @@ class AVeriTeCEvaluator:
             # gold
             tgt_strings = []
             gold_evidence = tgts.iloc[i]["evi"]
+            if not isinstance(gold_evidence, str):
+                gold_evidence = ""
             gold_qa_pairs = gold_evidence.split("\t\t\n\n")
 
             for qa_pair in gold_qa_pairs:
@@ -501,13 +513,17 @@ class EV2REvaluator:
 
             # Resume: skip claims already in checkpoint
             if i in already_done:
-                # reconstruct a response-like dict from saved record
+                # reconstruct a response-like object that mimics the real one
                 class _CachedResp:
                     pass
                 cr = _CachedResp()
                 cr.response = already_done[i]
                 cr.prompt = ""
                 cr.input = ""
+                # Required by extract_ev2r_score — identify by position
+                cr.id = i
+                cr.model = os.environ.get("OPENAI_EVAL_MODEL", "")
+                cr.finish_reason = "stop"
                 responses.append(cr)
                 print(f"[CHECKPOINT] skip {i} (cached)")
                 continue
