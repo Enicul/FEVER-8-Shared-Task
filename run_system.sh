@@ -1,7 +1,9 @@
 #!/bin/bash
+set -euo pipefail
 
-# Get SYSTEM_NAME from run_system.sh environment
-eval $(grep '^SYSTEM_NAME=' system_inference.sh)
+# Get SYSTEM_NAME from the environment, falling back to system_inference.sh's default.
+DEFAULT_SYSTEM_NAME="$(sed -n 's/^export SYSTEM_NAME="${SYSTEM_NAME:-\([^}]*\)}".*/\1/p' system_inference.sh)"
+export SYSTEM_NAME="${SYSTEM_NAME:-${DEFAULT_SYSTEM_NAME:-aic}}"
 
 
 # Create system-specific directory
